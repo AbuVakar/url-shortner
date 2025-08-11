@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import axios from 'axios';
 import { FiLink, FiExternalLink, FiCopy, FiUser, FiArrowRight } from 'react-icons/fi';
-import { API_URL } from './config';
+import { API_URL, axiosConfig } from './config';
 import './App.css';
 import AdminPage from './pages/AdminPage';
 
@@ -46,9 +46,11 @@ function App() {
 
     try {
       setLoading(true);
-      const res = await axios.post(`${API_URL}/api/shorten`, {
-        original_url: processedUrl,
-      });
+      const res = await axios.post(
+        `${API_URL}/api/shorten`,
+        { original_url: processedUrl },
+        axiosConfig
+      );
       
       const newShortUrl = res.data.short_url;
       setShortUrl(newShortUrl);

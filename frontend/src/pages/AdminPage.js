@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiExternalLink, FiTrash2, FiLogOut, FiRefreshCw } from 'react-icons/fi';
-import { API_URL } from '../config';
+import { API_URL, axiosConfig } from '../config';
 
 const AdminPage = () => {
   // State management
@@ -34,9 +34,16 @@ const AdminPage = () => {
     console.log('Current token:', localStorage.getItem('adminToken'));
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await axios.get(`${API_URL}/api/admin/urls`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(
+        `${API_URL}/api/admin/urls`,
+        {
+          ...axiosConfig,
+          headers: {
+            ...axiosConfig.headers,
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
       console.log('Fetched URLs:', response.data);
       if (response.data && response.data.length > 0) {
         console.log('First URL object structure:', response.data[0]);
