@@ -9,6 +9,9 @@ export const API_URL = isDevelopment
   ? 'http://localhost:5000'
   : API_BASE_URL;
 
+// Log the current API URL for debugging
+console.log('Using API URL:', API_URL);
+
 // Function to get axios config with optional auth token
 export const getAxiosConfig = (token) => {
   const config = {
