@@ -8,6 +8,7 @@ const AdminPage = () => {
   const [urls, setUrls] = useState([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false); // Separate state for login loading
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -66,52 +67,58 @@ const AdminPage = () => {
   // Handle login
   const handleLogin = useCallback(async (e) => {
     e.preventDefault();
-    if (!password) return;
+    if (!password) {
+      setError('Please enter the admin password');
+      return;
+    }
 
     try {
-      setLoading(true);
+      setLoginLoading(true);
       setError('');
       
-      // Try the new login endpoint first
-      try {
-        const response = await axios.post(
-          `${API_URL}/api/admin/login`,
-          { password },
-          getAxiosConfig()
-        );
-
-        if (response.data.token) {
-          localStorage.setItem('adminToken', response.data.token);
-          localStorage.setItem('isAdminAuthenticated', 'true');
-          setIsAuthenticated(true);
-          await fetchData();
-          return;
-        }
-      } catch (postErr) {
-        console.log('Standard login failed, trying direct token auth...', postErr);
-      }
-
-      // Fallback to direct token auth (for backward compatibility)
-      localStorage.setItem('adminToken', password);
-      localStorage.setItem('isAdminAuthenticated', 'true');
-      
-      // Verify the token works by making a test request to a protected endpoint
-      const response = await axios.get(
-        `${API_URL}/api/admin/urls`,
-        getAxiosConfig(password)
+      // Try the login endpoint
+      const response = await axios.post(
+        `${API_URL}/api/admin/login`,
+        { password },
+        getAxiosConfig()
       );
-      
-      // If we get here, authentication was successful
-      setIsAuthenticated(true);
-      setUrls(response.data);
+
+      if (response.data && response.data.success && response.data.token) {
+        // Store the token and set authentication state
+        localStorage.setItem('adminToken', response.data.token);
+        localStorage.setItem('isAdminAuthenticated', 'true');
+        
+        // Set authentication state
+        setIsAuthenticated(true);
+        
+        // Fetch the URLs after successful login
+        await fetchData();
+      } else {
+        throw new Error(response.data?.error || 'Invalid login response');
+      }
     } catch (err) {
       console.error('Login error:', err);
-      // Clear any invalid tokens
+      
+      // More specific error messages
+      let errorMessage = 'Login failed. Please try again.';
+      if (err.response) {
+        if (err.response.status === 401) {
+          errorMessage = 'Invalid password. Please try again.';
+        } else {
+          errorMessage = err.response.data?.error || err.response.statusText || errorMessage;
+        }
+      } else if (err.request) {
+        errorMessage = 'No response from server. Please check your connection.';
+      }
+      
+      setError(errorMessage);
+      
+      // Clear any existing authentication
       localStorage.removeItem('adminToken');
       localStorage.removeItem('isAdminAuthenticated');
-      setError(err.response?.data?.message || 'Invalid password. Please try again.');
+      setIsAuthenticated(false);
     } finally {
-      setLoading(false);
+      setLoginLoading(false);
     }
   }, [password, fetchData]);
 
@@ -204,10 +211,14 @@ const AdminPage = () => {
             </div>
             <button 
               type="submit" 
-              disabled={loading}
-              style={styles.primaryButton}
+              disabled={loginLoading}
+              style={{
+                ...styles.primaryButton,
+                opacity: loginLoading ? 0.7 : 1,
+                cursor: loginLoading ? 'wait' : 'pointer'
+              }}
             >
-              {loading ? 'Logging in...' : 'Login'}
+              {loginLoading ? 'Logging in...' : 'Login'}
             </button>
           </form>
         </div>

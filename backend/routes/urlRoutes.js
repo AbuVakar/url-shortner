@@ -17,6 +17,26 @@ const isAdmin = (req, res, next) => {
   res.status(401).json({ error: 'Unauthorized' });
 };
 
+// Admin login endpoint
+router.post("/api/admin/login", async (req, res) => {
+  const { password } = req.body;
+  const adminSecret = process.env.ADMIN_SECRET || 'admin123';
+  
+  if (password === adminSecret) {
+    // In a real app, use JWT or sessions
+    return res.json({ 
+      success: true,
+      token: adminSecret,
+      message: 'Login successful'
+    });
+  }
+  
+  res.status(401).json({ 
+    success: false,
+    error: 'Invalid credentials' 
+  });
+});
+
 // Create short URL
 router.post("/api/shorten", async (req, res) => {
   const { original_url } = req.body;
@@ -26,7 +46,12 @@ router.post("/api/shorten", async (req, res) => {
   const newUrl = new Url({ original_url, short_code });
   await newUrl.save();
 
-  res.json({ short_url: `http://localhost:5000/${short_code}` });
+  // Use environment variable for base URL or fallback to request origin
+  const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+  res.json({ 
+    short_url: `${baseUrl}/${short_code}`,
+    short_code
+  });
 });
 
 // Redirect to original URL and increment visit count
