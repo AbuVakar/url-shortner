@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import axios from 'axios';
 import { FiLink, FiExternalLink, FiCopy, FiUser, FiArrowRight } from 'react-icons/fi';
-import { API_URL, axiosConfig } from './config';
+import { API_URL, getAxiosConfig } from './config';
 import './App.css';
 import AdminPage from './pages/AdminPage';
 
@@ -38,18 +38,15 @@ function App() {
       return;
     }
 
-    // Add http:// if missing
-    let processedUrl = url.trim();
-    if (!processedUrl.startsWith('http://') && !processedUrl.startsWith('https://')) {
-      processedUrl = 'https://' + processedUrl;
-    }
+    // Add https:// if not present
+    const processedUrl = url.startsWith('http') ? url : `https://${url}`;
 
     try {
       setLoading(true);
       const res = await axios.post(
         `${API_URL}/api/shorten`,
         { original_url: processedUrl },
-        axiosConfig
+        getAxiosConfig()
       );
       
       const newShortUrl = res.data.short_url;

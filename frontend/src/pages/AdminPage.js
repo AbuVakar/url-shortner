@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import axios from 'axios';
 import { FiExternalLink, FiTrash2, FiLogOut, FiRefreshCw } from 'react-icons/fi';
-import { API_URL, axiosConfig } from '../config';
+import { API_URL, getAxiosConfig } from '../config';
 
 const AdminPage = () => {
   // State management
@@ -13,91 +13,136 @@ const AdminPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Check authentication status on component mount
-  useEffect(() => {
-    const token = localStorage.getItem('adminToken');
-    const isAuth = localStorage.getItem('isAdminAuthenticated') === 'true';
-    
-    if (isAuth && token) {
-      setIsAuthenticated(true);
-      fetchData();
-    } else {
-      setLoading(false);
-    }
+  // Handle logout
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('isAdminAuthenticated');
+    setIsAuthenticated(false);
+    setUrls([]);
+    setCurrentPage(1);
+    setError('');
   }, []);
 
   // Fetch URLs data
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError('');
     console.log('Fetching URLs...');
-    console.log('Current token:', localStorage.getItem('adminToken'));
+    const token = localStorage.getItem('adminToken');
+    console.log('Current token:', token);
+    
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    
     try {
-      const token = localStorage.getItem('adminToken');
       const response = await axios.get(
         `${API_URL}/api/admin/urls`,
-        {
-          ...axiosConfig,
-          headers: {
-            ...axiosConfig.headers,
-            Authorization: `Bearer ${token}`
-          }
-        }
+        getAxiosConfig(token)
       );
+      
       console.log('Fetched URLs:', response.data);
       if (response.data && response.data.length > 0) {
         console.log('First URL object structure:', response.data[0]);
         console.log('Available keys in URL object:', Object.keys(response.data[0]));
       }
       setUrls(response.data);
+      return response.data;
     } catch (err) {
       console.error('Error fetching URLs:', err);
       setError(err.response?.data?.message || 'Failed to load URLs');
+      
+      // If unauthorized, log the user out
+      if (err.response?.status === 401) {
+        handleLogout();
+      }
+      throw err;
     } finally {
       setLoading(false);
     }
-  };
+  }, [handleLogout]);
 
   // Handle login
-  const handleLogin = async (e) => {
+  const handleLogin = useCallback(async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    if (!password) return;
+
     try {
-      // Set the admin token directly in localStorage
+      setLoading(true);
+      setError('');
+      
+      // Try the new login endpoint first
+      try {
+        const response = await axios.post(
+          `${API_URL}/api/admin/login`,
+          { password },
+          getAxiosConfig()
+        );
+
+        if (response.data.token) {
+          localStorage.setItem('adminToken', response.data.token);
+          localStorage.setItem('isAdminAuthenticated', 'true');
+          setIsAuthenticated(true);
+          await fetchData();
+          return;
+        }
+      } catch (postErr) {
+        console.log('Standard login failed, trying direct token auth...', postErr);
+      }
+
+      // Fallback to direct token auth (for backward compatibility)
       localStorage.setItem('adminToken', password);
       localStorage.setItem('isAdminAuthenticated', 'true');
       
       // Verify the token works by making a test request to a protected endpoint
-      const response = await axios.get(`${API_URL}/api/admin/urls`, {
-        headers: { 
-          'Authorization': `Bearer ${password}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await axios.get(
+        `${API_URL}/api/admin/urls`,
+        getAxiosConfig(password)
+      );
       
       // If we get here, authentication was successful
       setIsAuthenticated(true);
       setUrls(response.data);
-      setLoading(false); // Make sure to set loading to false after successful login
     } catch (err) {
       console.error('Login error:', err);
       // Clear any invalid tokens
       localStorage.removeItem('adminToken');
       localStorage.removeItem('isAdminAuthenticated');
-      setError('Invalid password. Please try again.');
+      setError(err.response?.data?.message || 'Invalid password. Please try again.');
+    } finally {
       setLoading(false);
     }
-  };
+  }, [password, fetchData]);
 
-  // Logout function
-  const handleLogout = () => {
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('isAdminAuthenticated');
-    setIsAuthenticated(false);
-    setUrls([]);
-    setCurrentPage(1);
-  };
+  // handleLogout is already defined at the top of the component
+
+  // Handle delete URL
+  const handleDelete = useCallback(async (id) => {
+    if (!window.confirm('Are you sure you want to delete this URL?')) return;
+    
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('adminToken');
+      await axios.delete(
+        `${API_URL}/api/admin/urls/${id}`,
+        getAxiosConfig(token)
+      );
+      
+      // Refresh the URLs list
+      await fetchData();
+    } catch (err) {
+      console.error('Delete error:', err);
+      setError(err.response?.data?.message || 'Failed to delete URL');
+      
+      // If unauthorized, log the user out
+      if (err.response?.status === 401) {
+        handleLogout();
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchData, handleLogout]);
 
   // Tooltip component
   const Tooltip = ({ text, children }) => {
@@ -119,31 +164,7 @@ const AdminPage = () => {
     );
   };
 
-  // Handle URL deletion
-  const handleDelete = async (shortCode) => {
-    console.log('Delete button clicked');
-    console.log('URL object being deleted:', urls.find(url => url.short_code === shortCode));
-    console.log('Attempting to delete URL with short code:', shortCode);
-    if (!shortCode) {
-      console.error('No short code provided for deletion');
-      console.error('Available short codes:', urls.map(url => url.short_code));
-      setError('Error: No URL short code provided');
-      return;
-    }
-    
-    if (window.confirm('Are you sure you want to delete this URL?')) {
-      try {
-        const token = localStorage.getItem('adminToken');
-        await axios.delete(`${API_URL}/api/admin/urls/${shortCode}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setUrls(prevUrls => prevUrls.filter(url => url.short_code !== shortCode));
-      } catch (err) {
-        console.error('Error deleting URL:', err);
-        setError(err.response?.data?.message || 'Failed to delete URL');
-      }
-    }
-  };
+  // Handle URL deletion is already defined above with useCallback
 
   // Format date
   const formatDate = (dateString) => {

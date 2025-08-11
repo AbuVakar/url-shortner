@@ -9,10 +9,20 @@ export const API_URL = isDevelopment
   ? 'http://localhost:5000'
   : API_BASE_URL;
 
-// Axios defaults
-export const axiosConfig = {
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+// Function to get axios config with optional auth token
+export const getAxiosConfig = (token) => {
+  const config = {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    // Only include credentials for same-origin requests in production
+    withCredentials: !isDevelopment,
+  };
+
+  // Add auth token if provided
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
 };
