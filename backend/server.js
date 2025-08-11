@@ -12,13 +12,14 @@ const allowedOrigins = [
   'http://localhost:3001',
   'https://url-shortner-green-eight.vercel.app',
   'https://url-shortner-git-master-abuvakar.vercel.app',
-  'https://url-shortner-abuvakar.vercel.app'  // Add any other production domains here
+  'https://url-shortner-abuvakar.vercel.app'
 ];
 
 // Function to handle CORS
 const handleCors = (req, res, next) => {
   const origin = req.headers.origin;
   const requestMethod = req.method;
+  const requestHeaders = req.headers['access-control-request-headers'];
   
   console.log(`Incoming ${requestMethod} request from origin: ${origin}`);
   
@@ -26,33 +27,24 @@ const handleCors = (req, res, next) => {
   res.header('Vary', 'Origin');
   
   // In development, allow all origins for easier testing
-  if (process.env.NODE_ENV !== 'production') {
-    res.header('Access-Control-Allow-Origin', origin || '*');
+  if (process.env.NODE_ENV !== 'production' || !origin || allowedOrigins.includes(origin)) {
+    // Set the specific origin (not *) when credentials are required
+    res.header('Access-Control-Allow-Origin', origin || allowedOrigins[0]);
     res.header('Access-Control-Allow-Credentials', 'true');
     
+    // Handle preflight requests
     if (requestMethod === 'OPTIONS') {
-      res.header('Access-Control-Max-Age', '86400'); // 24 hours
+      // Cache preflight response for 2 hours (Chromium maximum)
+      res.header('Access-Control-Max-Age', '7200');
       res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+      res.header('Access-Control-Allow-Headers', requestHeaders || 'Content-Type, Authorization, Content-Length, X-Requested-With');
       res.header('Access-Control-Expose-Headers', 'Content-Length, X-Total-Count');
-      return res.status(204).end();
-    }
-    return next();
-  }
-  
-  // In production, only allow specific origins
-  if (!origin || allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
-    if (requestMethod === 'OPTIONS') {
-      res.header('Access-Control-Max-Age', '7200'); // 2 hours
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
-      res.header('Access-Control-Expose-Headers', 'Content-Length, X-Total-Count');
+      
+      // End the preflight request
       return res.status(204).end();
     }
     
+    // For non-preflight requests, just continue
     return next();
   }
   
@@ -61,7 +53,7 @@ const handleCors = (req, res, next) => {
   res.status(403).json({ 
     error: 'Not allowed by CORS',
     message: `The origin '${origin}' is not allowed to access this resource`,
-    allowedOrigins: allowedOrigins
+    allowedOrigins: process.env.NODE_ENV === 'production' ? undefined : allowedOrigins
   });
 };
 
