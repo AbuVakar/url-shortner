@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiExternalLink, FiTrash2, FiLogOut, FiRefreshCw } from 'react-icons/fi';
+import { API_URL } from '../config';
 
 const AdminPage = () => {
   // State management
@@ -33,7 +34,7 @@ const AdminPage = () => {
     console.log('Current token:', localStorage.getItem('adminToken'));
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await axios.get('http://localhost:5000/api/admin/urls', {
+      const response = await axios.get(`${API_URL}/api/admin/urls`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log('Fetched URLs:', response.data);
@@ -61,7 +62,7 @@ const AdminPage = () => {
       localStorage.setItem('isAdminAuthenticated', 'true');
       
       // Verify the token works by making a test request to a protected endpoint
-      const response = await axios.get('http://localhost:5000/api/admin/urls', {
+      const response = await axios.get(`${API_URL}/api/admin/urls`, {
         headers: { 
           'Authorization': `Bearer ${password}`,
           'Content-Type': 'application/json'
@@ -126,7 +127,7 @@ const AdminPage = () => {
     if (window.confirm('Are you sure you want to delete this URL?')) {
       try {
         const token = localStorage.getItem('adminToken');
-        await axios.delete(`http://localhost:5000/api/admin/urls/${shortCode}`, {
+        await axios.delete(`${API_URL}/api/admin/urls/${shortCode}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setUrls(prevUrls => prevUrls.filter(url => url.short_code !== shortCode));
@@ -270,12 +271,12 @@ const AdminPage = () => {
                   <tr key={url._id} style={styles.tr}>
                     <td style={styles.td}>
                       <a 
-                        href={`http://localhost:5000/${url.short_code}`}
+                        href={`${API_URL}/${url.short_code}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={styles.link}
                       >
-                        {`http://localhost:5000/${url.short_code}`}
+                        {`${API_URL}/${url.short_code}`}
                         <FiExternalLink size={14} style={{ marginLeft: '4px' }} />
                       </a>
                     </td>
