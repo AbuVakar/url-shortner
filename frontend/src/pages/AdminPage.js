@@ -104,22 +104,35 @@ const AdminPage = () => {
 
   // Handle URL deletion with optimistic updates and proper error handling
   const handleDelete = useCallback(async (url) => {
+    console.log('handleDelete called with URL:', url);
+    
     // Make sure we have a valid URL object with short_code
-    if (!url || !url.short_code) {
-      console.error('Invalid URL object or missing short_code:', url);
+    if (!url) {
+      const errorMsg = 'No URL object provided to handleDelete';
+      console.error(errorMsg);
       setError('Invalid URL data. Please refresh the page and try again.');
       return;
     }
+    
+    // Handle both naming conventions for short code
+    const shortCode = url.short_code || url.shortCode;
+    if (!shortCode) {
+      const errorMsg = 'No short_code found in URL object';
+      console.error(errorMsg, url);
+      setError('Invalid URL data. Missing short code.');
+      return;
+    }
 
-    const shortCode = url.short_code;
     console.log('Delete button clicked for URL:', { shortCode, url });
 
-    if (!window.confirm(`Are you sure you want to delete the URL: ${url.original_url}?`)) {
+    if (!window.confirm(`Are you sure you want to delete the URL: ${url.original_url || 'Unknown URL'}?`)) {
       return;
     }
     
     const token = localStorage.getItem('adminToken');
     if (!token) {
+      const errorMsg = 'No admin token found';
+      console.error(errorMsg);
       setError('Your session has expired. Please log in again.');
       handleLogout();
       return;
@@ -130,7 +143,7 @@ const AdminPage = () => {
     
     // Optimistic update: Remove the item from UI immediately
     setUrls(prevUrls => {
-      const newUrls = prevUrls.filter(u => u.short_code !== shortCode);
+      const newUrls = prevUrls.filter(u => (u.short_code || u.shortCode) !== shortCode);
       // If we're on the last page with one item, go to previous page
       if (newUrls.length % itemsPerPage === 0 && currentPage > 1) {
         setCurrentPage(prev => Math.max(1, prev - 1));
@@ -139,16 +152,23 @@ const AdminPage = () => {
     });
     
     try {
+      console.log(`Sending DELETE request to: ${API_URL}/api/admin/urls/${encodeURIComponent(shortCode)}`);
+      
       const response = await axios.delete(
         `${API_URL}/api/admin/urls/${encodeURIComponent(shortCode)}`,
         getAxiosConfig(token)
       );
       
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to delete URL');
+      console.log('Delete response:', response.data);
+      
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.error || 'Failed to delete URL');
       }
       
       console.log('Successfully deleted URL:', response.data);
+      
+      // Show success message
+      // You could add a toast notification here if desired
       
     } catch (err) {
       console.error('Error deleting URL:', {

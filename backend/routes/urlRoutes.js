@@ -142,16 +142,35 @@ router.get("/api/admin/urls", isAdmin, async (req, res) => {
   }
 });
 
-// Admin: Delete URL (Optimized for performance)
+// Admin: Delete URL with improved error handling and logging
 router.delete("/api/admin/urls/:code", isAdmin, async (req, res) => {
+  const { code } = req.params;
+  
+  // Log the incoming request details
+  console.log('Delete request received:', {
+    code,
+    method: req.method,
+    url: req.originalUrl,
+    headers: req.headers,
+    params: req.params,
+    query: req.query
+  });
+
+  // Validate the code parameter
+  if (!code || code === 'undefined') {
+    console.error('Invalid or missing code parameter');
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid URL code',
+      deletedCount: 0
+    });
+  }
+
   try {
-    const { code } = req.params;
-    console.log(`Attempting to delete URL with code: ${code}`);
-    
     // First check if the URL exists
     const url = await Url.findOne({ short_code: code });
     if (!url) {
-      console.log(`URL with code ${code} not found`);
+      console.log(`URL with code "${code}" not found`);
       return res.status(404).json({ 
         success: false,
         error: 'URL not found',
@@ -160,19 +179,19 @@ router.delete("/api/admin/urls/:code", isAdmin, async (req, res) => {
     }
     
     // Delete the URL
+    console.log(`Attempting to delete URL with code: "${code}"`);
     const result = await Url.deleteOne({ short_code: code });
-    console.log(`Delete result:`, result);
     
     if (result.deletedCount === 0) {
-      console.log(`Failed to delete URL with code: ${code}`);
+      console.error(`Failed to delete URL with code: "${code}"`);
       return res.status(500).json({ 
         success: false,
-        error: 'Failed to delete URL',
+        error: 'Failed to delete URL from database',
         deletedCount: 0
       });
     }
     
-    console.log(`Successfully deleted URL with code: ${code}`);
+    console.log(`Successfully deleted URL with code: "${code}"`);
     return res.json({ 
       success: true,
       message: 'URL deleted successfully',
