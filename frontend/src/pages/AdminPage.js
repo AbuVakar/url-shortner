@@ -110,7 +110,7 @@ const AdminPage = () => {
   const handleDelete = useCallback(async (url) => {
     console.log('handleDelete called with URL:', url);
     
-    // Make sure we have a valid URL object with short_code
+    // Make sure we have a valid URL object
     if (!url) {
       const errorMsg = 'No URL object provided to handleDelete';
       console.error(errorMsg);
@@ -118,12 +118,25 @@ const AdminPage = () => {
       return;
     }
     
-    // Handle both naming conventions for short code
-    const shortCode = url.short_code || url.shortCode;
+    // Extract the short code from the URL object
+    // It could be in short_code, shortCode, or we can try to extract it from the short URL
+    let shortCode = url.short_code || url.shortCode;
+    
+    // If we don't have a short code, try to extract it from the short URL
+    if (!shortCode && url.short_url) {
+      const urlParts = url.short_url.split('/');
+      shortCode = urlParts[urlParts.length - 1];
+    }
+    
+    // If we still don't have a short code, try to find it in the _id field
+    if (!shortCode && url._id) {
+      shortCode = url._id;
+    }
+    
     if (!shortCode) {
-      const errorMsg = 'No short_code found in URL object';
+      const errorMsg = 'Could not determine short code for deletion';
       console.error(errorMsg, url);
-      setError('Invalid URL data. Missing short code.');
+      setError('Invalid URL data. Could not determine which URL to delete.');
       return;
     }
 
@@ -147,7 +160,14 @@ const AdminPage = () => {
     
     // Optimistic update: Remove the item from UI immediately
     setUrls(prevUrls => {
-      const newUrls = prevUrls.filter(u => (u.short_code || u.shortCode) !== shortCode);
+      const newUrls = prevUrls.filter(u => {
+        // Check all possible fields that might contain the short code
+        const uShortCode = u.short_code || u.shortCode || 
+                          (u.short_url ? u.short_url.split('/').pop() : null) || 
+                          u._id;
+        return uShortCode !== shortCode;
+      });
+      
       // If we're on the last page with one item, go to previous page
       if (newUrls.length % itemsPerPage === 0 && currentPage > 1) {
         setCurrentPage(prev => Math.max(1, prev - 1));
