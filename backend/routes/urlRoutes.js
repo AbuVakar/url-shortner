@@ -126,6 +126,26 @@ router.get("/:code", async (req, res) => {
   }
 });
 
+// Admin:// Delete all URLs (admin only)
+router.delete("/api/admin/urls", isAdmin, async (req, res) => {
+  try {
+    const result = await Url.deleteMany({});
+    console.log(`Deleted ${result.deletedCount} URLs`);
+    res.json({ 
+      success: true, 
+      message: `Successfully deleted ${result.deletedCount} URLs`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error deleting all URLs:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to delete all URLs',
+      details: error.message
+    });
+  }
+});
+
 // Admin: Get all URLs
 router.get("/api/admin/urls", isAdmin, async (req, res) => {
   try {

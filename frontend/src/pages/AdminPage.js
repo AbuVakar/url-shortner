@@ -9,6 +9,7 @@ const AdminPage = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false); // Separate state for login loading
+  const [deletingAll, setDeletingAll] = useState(false); // Separate state for bulk deletion
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -23,6 +24,47 @@ const AdminPage = () => {
     setCurrentPage(1);
     setError('');
   }, []);
+
+  // Delete all URLs
+  const handleDeleteAll = async () => {
+    if (!window.confirm('Are you sure you want to delete ALL URLs? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingAll(true);
+    setError('');
+    
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_URL}/api/admin/urls`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete all URLs');
+      }
+
+      // Clear the URLs from state
+      setUrls([]);
+      setCurrentPage(1);
+      
+      // Show success message
+      alert(`Successfully deleted ${data.deletedCount || 'all'} URLs`);
+      
+    } catch (error) {
+      console.error('Error deleting all URLs:', error);
+      setError(`Error: ${error.message || 'Failed to delete all URLs'}`);
+    } finally {
+      setDeletingAll(false);
+    }
+  };
 
   // Fetch URLs data with caching
   const fetchData = useCallback(async () => {
@@ -353,10 +395,24 @@ const AdminPage = () => {
       <div style={styles.header}>
         <h2>URL Shortener Admin</h2>
         <div style={styles.headerActions}>
+          <Tooltip text="Delete All URLs">
+            <button 
+              onClick={handleDeleteAll}
+              disabled={deletingAll || loading}
+              style={{ 
+                ...styles.iconButton, 
+                marginRight: '10px',
+                backgroundColor: deletingAll ? '#F59E0B' : '#EF4444',
+                color: 'white'
+              }}
+            >
+              {deletingAll ? 'Deleting...' : 'Delete All'}
+            </button>
+          </Tooltip>
           <Tooltip text="Refresh">
             <button 
               onClick={fetchData} 
-              disabled={loading}
+              disabled={loading || deletingAll}
               style={styles.iconButton}
             >
               <FiRefreshCw size={20} />
@@ -365,6 +421,7 @@ const AdminPage = () => {
           <Tooltip text="Logout">
             <button 
               onClick={handleLogout}
+              disabled={deletingAll}
               style={{ ...styles.iconButton, marginLeft: '10px' }}
             >
               <FiLogOut size={20} />
@@ -397,25 +454,62 @@ const AdminPage = () => {
 
       {/* URL Table */}
       <div style={styles.tableContainer}>
-        {loading ? (
-          <div style={styles.loading}>
-            <p>Loading URLs...</p>
           </div>
-        ) : error ? (
-          <div style={styles.errorBox}>
-            <p>{error}</p>
-            <button 
-              onClick={fetchData}
-              style={styles.retryButton}
-            >
-              Retry
-            </button>
-          </div>
-        ) : urls.length === 0 ? (
-          <div style={styles.emptyState}>
-            <p>No URLs found. Start by creating your first short URL.</p>
-          </div>
-        ) : (
+        </div>
+      ) : urls.length === 0 ? (
+        <div style={styles.emptyState}>
+          <p>No URLs found. Start by creating your first short URL.</p>
+        </div>
+      ) : (
+        <>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={{ ...styles.th, width: '20%' }}>Short URL</th>
+                <th style={{ ...styles.th, width: '50%' }}>Original URL</th>
+                <th style={{ ...styles.th, width: '10%', textAlign: 'right' }}>Visits</th>
+                <th style={{ ...styles.th, width: '12%' }}>Created</th>
+                <th style={{ ...styles.th, width: '8%', textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentItems.map((url) => (
+                <tr key={url._id} style={styles.tr}>
+                  <td style={styles.td}>
+                    <a 
+                      href={`${API_URL}/${url.short_code}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={styles.link}
+                    >
+                      {`${API_URL}/${url.short_code}`}
+                      <FiExternalLink size={14} style={{ marginLeft: '4px' }} />
+                    </a>
+                  </td>
+                  <td style={styles.td}>
+                    <span style={styles.originalUrl} title={url.original_url}>
+                      {url.original_url && url.original_url.length > 50 
+                        ? `${url.original_url.substring(0, 47)}...` 
+                        : url.original_url}
+                    </span>
+                  </td>
+                  <td style={{ ...styles.td, textAlign: 'right' }}>
+                    {url.visits || 0}
+                  </td>
+                  <td style={styles.td}>
+                    {formatDate(url.created_at || url.createdAt || url.date_created)}
+                  </td>
+                  <td style={{ ...styles.td, textAlign: 'right' }} key={`actions-${url.short_code}`}>
+                    <button
+                      onClick={() => handleDelete(url)}
+                      style={{ ...styles.iconButton, color: '#EF4444' }}
+                      title="Delete URL"
+                      key={`delete-${url.short_code}`}
+                      aria-label={`Delete ${url.short_code}`}
+                    >
+                      <FiTrash2 />
+                    </button>
+                  </td>
           <>
             <table style={styles.table}>
               <thead>
