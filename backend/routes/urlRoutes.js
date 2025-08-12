@@ -119,18 +119,9 @@ router.get("/:code", async (req, res) => {
         redirect: urlData.original_url,
         visits: urlData.visits
       });
-    } else {
-      // Regular browser request
-      return res.redirect(302, urlData.original_url);
     }
-    } else {
-      if (req.xhr || req.get('X-Requested-With') === 'XMLHttpRequest') {
-        return res.status(404).json({ error: "URL not found" });
-      } else {
-        // For direct browser access, send a simple HTML response
-        return res.status(404).send('<h1>404 - URL not found</h1>');
-      }
-    }
+    // Regular browser request
+    return res.redirect(302, urlData.original_url);
   } catch (err) {
     console.error("Redirect error:", err);
     if (req.xhr || req.get('X-Requested-With') === 'XMLHttpRequest') {
