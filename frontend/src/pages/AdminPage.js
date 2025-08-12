@@ -103,12 +103,24 @@ const AdminPage = () => {
   };
 
   // Handle URL deletion with optimistic updates and proper error handling
-  const handleDelete = useCallback(async (shortCode) => {
-    if (!window.confirm('Are you sure you want to delete this URL?')) return;
+  const handleDelete = useCallback(async (url) => {
+    // Make sure we have a valid URL object with short_code
+    if (!url || !url.short_code) {
+      console.error('Invalid URL object or missing short_code:', url);
+      setError('Invalid URL data. Please refresh the page and try again.');
+      return;
+    }
+
+    const shortCode = url.short_code;
+    console.log('Delete button clicked for URL:', { shortCode, url });
+
+    if (!window.confirm(`Are you sure you want to delete the URL: ${url.original_url}?`)) {
+      return;
+    }
     
     const token = localStorage.getItem('adminToken');
     if (!token) {
-      setError('Not authenticated. Please log in again.');
+      setError('Your session has expired. Please log in again.');
       handleLogout();
       return;
     }
@@ -118,7 +130,7 @@ const AdminPage = () => {
     
     // Optimistic update: Remove the item from UI immediately
     setUrls(prevUrls => {
-      const newUrls = prevUrls.filter(url => url.short_code !== shortCode);
+      const newUrls = prevUrls.filter(u => u.short_code !== shortCode);
       // If we're on the last page with one item, go to previous page
       if (newUrls.length % itemsPerPage === 0 && currentPage > 1) {
         setCurrentPage(prev => Math.max(1, prev - 1));
@@ -127,9 +139,8 @@ const AdminPage = () => {
     });
     
     try {
-      // Make the delete request
       const response = await axios.delete(
-        `${API_URL}/api/admin/urls/${shortCode}`,
+        `${API_URL}/api/admin/urls/${encodeURIComponent(shortCode)}`,
         getAxiosConfig(token)
       );
       
@@ -139,22 +150,39 @@ const AdminPage = () => {
       
       console.log('Successfully deleted URL:', response.data);
       
-      // Show success message (optional)
-      // You can add a toast notification here if you want
-      
     } catch (err) {
-      console.error('Error deleting URL:', err);
+      console.error('Error deleting URL:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        url: err.config?.url
+      });
       
       // Revert the optimistic update
       setUrls(previousUrls);
       
       // Show error message
-      setError(err.response?.data?.error || err.message || 'Failed to delete URL');
+      let errorMessage = 'Failed to delete URL. ';
       
-      // If unauthorized, log the user out
-      if (err.response?.status === 401) {
-        handleLogout();
+      if (err.response) {
+        // Server responded with an error status code
+        if (err.response.status === 401) {
+          errorMessage += 'Your session has expired. ';
+          handleLogout();
+        } else if (err.response.status === 404) {
+          errorMessage += 'The URL was not found. It may have already been deleted.';
+        } else if (err.response.data?.error) {
+          errorMessage += err.response.data.error;
+        }
+      } else if (err.request) {
+        // Request was made but no response received
+        errorMessage += 'No response from server. Please check your connection.';
+      } else {
+        // Something else went wrong
+        errorMessage += err.message || 'An unknown error occurred.';
       }
+      
+      setError(errorMessage);
     }
   }, [currentPage, itemsPerPage, urls, handleLogout]);
 
@@ -342,10 +370,11 @@ const AdminPage = () => {
                     </td>
                     <td style={{ ...styles.td, textAlign: 'right' }} key={`actions-${url.short_code}`}>
                       <button
-                        onClick={() => handleDelete(url.short_code)}
+                        onClick={() => handleDelete(url)}
                         style={{ ...styles.iconButton, color: '#EF4444' }}
                         title="Delete URL"
                         key={`delete-${url.short_code}`}
+                        aria-label={`Delete ${url.short_code}`}
                       >
                         <FiTrash2 />
                       </button>
