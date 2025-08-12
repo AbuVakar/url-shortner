@@ -17,12 +17,19 @@ const AdminPage = () => {
 
   // Handle logout
   const handleLogout = useCallback(() => {
+    // Clear all auth related data
     localStorage.removeItem('adminToken');
     localStorage.removeItem('isAdminAuthenticated');
+    
+    // Reset all state
     setIsAuthenticated(false);
     setUrls([]);
     setCurrentPage(1);
     setError('');
+    setPassword('');
+    
+    // Force a full page reload to ensure clean state
+    window.location.href = '/admin';
   }, []);
 
   // Delete all URLs
