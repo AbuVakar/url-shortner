@@ -148,6 +148,32 @@ const AdminPage = () => {
     }
   };
 
+  // Clear recent links (last 10)
+  const clearRecentLinks = async () => {
+    if (!window.confirm('Are you sure you want to clear the most recent 10 links?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await axios.delete(
+        `${API_URL}/api/admin/recent-links`,
+        getAxiosConfig(token)
+      );
+
+      if (response.data.success) {
+        // Refresh the URL list
+        await fetchData();
+        alert('Successfully cleared recent links');
+      } else {
+        throw new Error(response.data.error || 'Failed to clear recent links');
+      }
+    } catch (error) {
+      console.error('Error clearing recent links:', error);
+      setError(`Error: ${error.response?.data?.error || error.message || 'Failed to clear recent links'}`);
+    }
+  };
+
   // Handle URL deletion with optimistic updates and proper error handling
   const handleDelete = useCallback(async (url) => {
     console.log('handleDelete called with URL:', url);
@@ -474,6 +500,20 @@ const AdminPage = () => {
               {deletingAll ? 'Deleting...' : 'Delete All'}
             </button>
           </Tooltip>
+          <Tooltip text="Clear Recent Links">
+            <button 
+              onClick={clearRecentLinks}
+              disabled={loading || urls.length === 0}
+              style={{ 
+                ...styles.iconButton, 
+                marginRight: '10px',
+                backgroundColor: '#3B82F6',
+                color: 'white'
+              }}
+            >
+              Clear Recent
+            </button>
+          </Tooltip>
           <Tooltip text="Refresh">
             <button 
               onClick={fetchData} 
@@ -571,7 +611,8 @@ const AdminPage = () => {
                       </span>
                     </td>
                     <td style={{ ...styles.td, textAlign: 'right' }}>
-                      {url.visits || 0}
+                      {/* Ensure visits is a number and handle undefined/null cases */}
+                      {typeof url.visits === 'number' ? Math.max(0, url.visits) : 0}
                     </td>
                     <td style={styles.td}>
                       {formatDate(url.created_at || url.createdAt || url.date_created)}
