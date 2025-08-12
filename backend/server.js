@@ -12,7 +12,8 @@ const allowedOrigins = [
   'http://localhost:3001',
   'https://url-shortner-green-eight.vercel.app',
   'https://url-shortner-git-master-abuvakar.vercel.app',
-  'https://url-shortner-abuvakar.vercel.app'
+  'https://url-shortner-abuvakar.vercel.app',
+  'https://url-shortner-psi-one.vercel.app'  // Added new Vercel domain
 ];
 
 // Function to handle CORS
@@ -22,6 +23,16 @@ const handleCors = (req, res, next) => {
   const requestHeaders = req.headers['access-control-request-headers'];
   
   console.log(`Incoming ${requestMethod} request from origin: ${origin}`);
+  
+  // Handle preflight requests
+  if (requestMethod === 'OPTIONS') {
+    console.log('Handling preflight request');
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    return res.status(200).end();
+  }
   
   // Always set Vary header for proper caching
   res.header('Vary', 'Origin');
