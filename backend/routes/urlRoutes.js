@@ -145,18 +145,48 @@ router.get("/api/admin/urls", isAdmin, async (req, res) => {
 // Admin: Delete URL (Optimized for performance)
 router.delete("/api/admin/urls/:code", isAdmin, async (req, res) => {
   try {
-    // Use deleteOne directly without checking first for better performance
-    const result = await Url.deleteOne({ short_code: req.params.code });
+    const { code } = req.params;
+    console.log(`Attempting to delete URL with code: ${code}`);
     
-    // If you need to know if the document was deleted, use result.deletedCount
-    // But don't make an extra query just to check if it existed
+    // First check if the URL exists
+    const url = await Url.findOne({ short_code: code });
+    if (!url) {
+      console.log(`URL with code ${code} not found`);
+      return res.status(404).json({ 
+        success: false,
+        error: 'URL not found',
+        deletedCount: 0
+      });
+    }
+    
+    // Delete the URL
+    const result = await Url.deleteOne({ short_code: code });
+    console.log(`Delete result:`, result);
+    
+    if (result.deletedCount === 0) {
+      console.log(`Failed to delete URL with code: ${code}`);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Failed to delete URL',
+        deletedCount: 0
+      });
+    }
+    
+    console.log(`Successfully deleted URL with code: ${code}`);
     return res.json({ 
       success: true,
-      deletedCount: result.deletedCount 
+      message: 'URL deleted successfully',
+      deletedCount: result.deletedCount,
+      short_code: code
     });
+    
   } catch (err) {
     console.error("Delete error:", err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ 
+      success: false,
+      error: err.message || 'Server error during deletion',
+      deletedCount: 0
+    });
   }
 });
 

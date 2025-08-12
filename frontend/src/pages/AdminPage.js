@@ -102,15 +102,19 @@ const AdminPage = () => {
     }
   };
 
-  // Handle URL deletion with optimistic updates
+  // Handle URL deletion with optimistic updates and proper error handling
   const handleDelete = useCallback(async (shortCode) => {
     if (!window.confirm('Are you sure you want to delete this URL?')) return;
     
     const token = localStorage.getItem('adminToken');
     if (!token) {
-      setError('Not authenticated');
+      setError('Not authenticated. Please log in again.');
+      handleLogout();
       return;
     }
+    
+    // Store the current URLs in case we need to revert
+    const previousUrls = [...urls];
     
     // Optimistic update: Remove the item from UI immediately
     setUrls(prevUrls => {
@@ -122,17 +126,37 @@ const AdminPage = () => {
       return newUrls;
     });
     
-    // Fire and forget the delete request
-    axios.delete(
-      `${API_URL}/api/admin/urls/${shortCode}`,
-      getAxiosConfig(token)
-    ).catch(err => {
+    try {
+      // Make the delete request
+      const response = await axios.delete(
+        `${API_URL}/api/admin/urls/${shortCode}`,
+        getAxiosConfig(token)
+      );
+      
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Failed to delete URL');
+      }
+      
+      console.log('Successfully deleted URL:', response.data);
+      
+      // Show success message (optional)
+      // You can add a toast notification here if you want
+      
+    } catch (err) {
       console.error('Error deleting URL:', err);
-      // Revert the optimistic update if there's an error
-      fetchData();
-      setError(err.response?.data?.error || 'Failed to delete URL');
-    });
-  }, [currentPage, itemsPerPage]); // Only include the dependencies we actually use
+      
+      // Revert the optimistic update
+      setUrls(previousUrls);
+      
+      // Show error message
+      setError(err.response?.data?.error || err.message || 'Failed to delete URL');
+      
+      // If unauthorized, log the user out
+      if (err.response?.status === 401) {
+        handleLogout();
+      }
+    }
+  }, [currentPage, itemsPerPage, urls, handleLogout]);
 
   // Tooltip component
   const Tooltip = ({ text, children }) => {
