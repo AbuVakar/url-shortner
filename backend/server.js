@@ -6,70 +6,68 @@ const cors = require("cors");
 dotenv.config();
 const app = express();
 
-// Configure CORS with specific origin and credentials support
+// CORS configuration with performance optimizations
 const allowedOrigins = [
   'http://localhost:3000',
-  'http://localhost:3001',
-  'https://url-shortner-green-eight.vercel.app',
-  'https://url-shortner-git-master-abuvakar.vercel.app',
-  'https://url-shortner-abuvakar.vercel.app',
-  'https://url-shortner-psi-one.vercel.app'  // Added new Vercel domain
+  'https://url-shortner-psi-one.vercel.app',
+  'https://url-shortner-dcei.onrender.com',
+  'https://url-shortener-frontend-1.onrender.com'
 ];
 
-// Function to handle CORS
-const handleCors = (req, res, next) => {
+// Cache for CORS preflight
+const corsCache = new Map();
+
+// Custom CORS middleware with performance optimizations
+const corsMiddleware = (req, res, next) => {
   const origin = req.headers.origin;
   const requestMethod = req.method;
   const requestHeaders = req.headers['access-control-request-headers'];
   
-  console.log(`Incoming ${requestMethod} request from origin: ${origin}`);
+  // Log incoming requests (can be disabled in production)
+  console.log(`[${new Date().toISOString()}] ${requestMethod} ${req.path} from ${origin || 'unknown origin'}`);
   
   // Handle preflight requests
   if (requestMethod === 'OPTIONS') {
     console.log('Handling preflight request');
-    res.header('Access-Control-Allow-Origin', origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    return res.status(200).end();
+    
+    // Check if origin is allowed
+    const isAllowed = !origin || allowedOrigins.includes(origin) || 
+      allowedOrigins.some(allowed => origin.endsWith(`.${allowed.replace(/^https?:\/\//, '')}`));
+    
+    if (isAllowed) {
+      // Set CORS headers
+      res.header('Access-Control-Allow-Origin', origin || allowedOrigins[0]);
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', requestHeaders || 'Content-Type, Authorization');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Max-Age', '600'); // Cache for 10 minutes
+      
+      // End preflight request
+      return res.status(204).end();
+    } else {
+      // Origin not allowed
+      console.warn(`CORS blocked preflight from: ${origin}`);
+      return res.status(403).json({ 
+        error: 'Not allowed by CORS',
+        message: `The origin '${origin}' is not allowed to access this resource`
+      });
+    }
   }
   
-  // Always set Vary header for proper caching
-  res.header('Vary', 'Origin');
-  
-  // In development, allow all origins for easier testing
-  if (process.env.NODE_ENV !== 'production' || !origin || allowedOrigins.includes(origin)) {
-    // Set the specific origin (not *) when credentials are required
+  // For non-preflight requests, set CORS headers if origin is allowed
+  if (!origin || allowedOrigins.includes(origin) || 
+      allowedOrigins.some(allowed => origin.endsWith(`.${allowed.replace(/^https?:\/\//, '')}`))) {
     res.header('Access-Control-Allow-Origin', origin || allowedOrigins[0]);
     res.header('Access-Control-Allow-Credentials', 'true');
-    
-    // Handle preflight requests
-    if (requestMethod === 'OPTIONS') {
-      // Cache preflight response for 2 hours (Chromium maximum)
-      res.header('Access-Control-Max-Age', '7200');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', requestHeaders || 'Content-Type, Authorization, Content-Length, X-Requested-With');
-      res.header('Access-Control-Expose-Headers', 'Content-Length, X-Total-Count');
-      
-      // End the preflight request
-      return res.status(204).end();
-    }
-    
-    // For non-preflight requests, just continue
-    return next();
+    res.header('Vary', 'Origin'); // Important for caching
   }
   
-  // Not allowed by CORS
-  console.warn(`CORS blocked request from origin: ${origin}`);
-  res.status(403).json({ 
-    error: 'Not allowed by CORS',
-    message: `The origin '${origin}' is not allowed to access this resource`,
-    allowedOrigins: process.env.NODE_ENV === 'production' ? undefined : allowedOrigins
-  });
+  // Continue to next middleware
+  next();
 };
 
 // Apply CORS middleware
-app.use(handleCors);
+app.use(corsMiddleware);
 
 // Add a simple health check endpoint
 app.get('/health', (req, res) => {
@@ -77,9 +75,48 @@ app.get('/health', (req, res) => {
 });
 app.use(express.json());
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch(err => console.log(err));
+// Optimized MongoDB connection settings
+const mongooseOptions = {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000,  // Timeout after 5s instead of 30s
+  socketTimeoutMS: 45000,          // Close sockets after 45s of inactivity
+  maxPoolSize: 10,                // Maintain up to 10 socket connections
+  serverApi: {
+    version: '1',
+    strict: true,
+    deprecationErrors: true,
+  },
+  retryWrites: true,
+  w: 'majority'
+};
+
+// Connect to MongoDB with retry logic
+const connectWithRetry = () => {
+  console.log('Attempting to connect to MongoDB...');
+  return mongoose.connect(process.env.MONGO_URI, mongooseOptions)
+    .then(() => console.log('✅ MongoDB Connected'))
+    .catch(err => {
+      console.error('MongoDB connection error:', err.message);
+      console.log('Retrying connection in 5 seconds...');
+      setTimeout(connectWithRetry, 5000);
+    });
+};
+
+// Handle connection events
+mongoose.connection.on('connected', () => {
+  console.log('Mongoose connected to DB');});
+
+mongoose.connection.on('error', (err) => {
+  console.error('Mongoose connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('Mongoose disconnected');
+});
+
+// Start initial connection
+connectWithRetry();
 
 // Import routes
 const urlRoutes = require("./routes/urlRoutes");
