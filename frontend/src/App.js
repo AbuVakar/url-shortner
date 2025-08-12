@@ -5,6 +5,7 @@ import { FiLink, FiExternalLink, FiCopy, FiUser, FiArrowRight } from 'react-icon
 import { API_URL, getAxiosConfig } from './config';
 import './App.css';
 import AdminPage from './pages/AdminPage';
+import Redirect from './components/Redirect';
 
 function App() {
   const [url, setUrl] = useState('');
@@ -124,6 +125,7 @@ function App() {
         }}>
           <Routes>
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/:code" element={<Redirect />} />
             <Route path="/" element={
               <>
                 {/* Hero Section */}
