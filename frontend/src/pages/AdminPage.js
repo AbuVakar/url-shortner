@@ -422,40 +422,6 @@ const AdminPage = () => {
     );
   }
 
-  // Main admin dashboard
-  // Render login form if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.loginContainer}>
-          <h2>Admin Login</h2>
-          {error && <div style={styles.errorBox}><p>{error}</p></div>}
-          <form onSubmit={handleLogin} style={styles.loginForm}>
-            <div style={styles.formGroup}>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter admin password"
-                autoComplete="new-password"
-                required
-                style={styles.input}
-              />
-            </div>
-            <button 
-              type="submit" 
-              disabled={loginLoading}
-              style={styles.loginButton}
-            >
-              {loginLoading ? 'Logging in...' : 'Login'}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // Main admin dashboard
   // Render login form if not authenticated
   if (!isAuthenticated) {
     return (
