@@ -46,10 +46,14 @@ router.post("/api/shorten", async (req, res) => {
   const newUrl = new Url({ original_url, short_code });
   await newUrl.save();
 
-  // Use environment variable for base URL or fallback to request origin
-  const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+  // Always use the configured BASE_URL for short URLs
+  // This ensures consistent domain usage across all environments
+  const frontendDomain = process.env.BASE_URL || 'https://url-shortner-psi-one.vercel.app';
+  const shortUrl = `${frontendDomain}/${short_code}`;
+  
+  console.log('Generated short URL:', shortUrl);
   res.json({ 
-    short_url: `${baseUrl}/${short_code}`,
+    short_url: shortUrl,
     short_code
   });
 });
