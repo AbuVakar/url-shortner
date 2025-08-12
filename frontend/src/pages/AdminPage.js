@@ -64,16 +64,20 @@ const AdminPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [handleLogout]);
+  }, [urls.length, handleLogout]);
 
   // Handle login
-  const handleLogin = useCallback(async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setError('');
+    setLoginLoading(true);
+    
     if (!password) {
-      setError('Please enter the admin password');
+      setError('Please enter a password');
+      setLoginLoading(false);
       return;
     }
-
+    
     try {
       const response = await axios.post(
         `${API_URL}/api/admin/login`,
@@ -204,7 +208,7 @@ const AdminPage = () => {
       
       setError(errorMessage);
     }
-  }, [currentPage, itemsPerPage, urls, handleLogout]);
+  }, [currentPage, itemsPerPage, urls, handleLogout, setError, setUrls]);
 
   // Tooltip component
   const Tooltip = ({ text, children }) => {
