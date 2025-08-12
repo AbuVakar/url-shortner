@@ -94,23 +94,28 @@ router.post("/api/shorten", async (req, res) => {
 // Redirect to original URL and increment visit count
 router.get("/:code", async (req, res) => {
   try {
-    // First find the URL without updating
-    let urlData = await Url.findOne({ short_code: req.params.code });
+    const { code } = req.params;
+    
+    // Find the URL and atomically increment the visit count
+    const urlData = await Url.findOneAndUpdate(
+      { short_code: code },
+      [
+        {
+          $set: {
+            visits: { $add: ["$visits", 1] },
+            updated_at: new Date()
+          }
+        }
+      ],
+      { 
+        new: true,
+        // Skip updating the visit count for admin interface requests
+        ...(req.get('Referer')?.includes('/admin') ? { runValidators: false } : {})
+      }
+    );
     
     if (!urlData) {
       return res.status(404).json({ error: 'URL not found' });
-    }
-    
-    // Only increment visits if this is not a redirect from the admin interface
-    const isAdminRequest = req.get('Referer') && req.get('Referer').includes('/admin');
-    
-    if (!isAdminRequest) {
-      // Update the visit count and get the updated document
-      urlData = await Url.findOneAndUpdate(
-        { _id: urlData._id },
-        { $inc: { visits: 1 }, $set: { updated_at: new Date() } },
-        { new: true }
-      );
     }
     
     // Check if it's an AJAX request
@@ -120,6 +125,7 @@ router.get("/:code", async (req, res) => {
         visits: urlData.visits
       });
     }
+    
     // Regular browser request
     return res.redirect(302, urlData.original_url);
   } catch (err) {

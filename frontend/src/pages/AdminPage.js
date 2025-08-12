@@ -28,8 +28,8 @@ const AdminPage = () => {
     setError('');
     setPassword('');
     
-    // Force a full page reload to ensure clean state
-    window.location.href = '/admin';
+    // Redirect to main page after logout
+    window.location.href = '/';
   }, []);
 
   // Delete all URLs
