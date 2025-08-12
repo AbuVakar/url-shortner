@@ -205,6 +205,7 @@ const AdminPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter admin password"
+                autoComplete="new-password"
                 required
                 style={styles.input}
               />
