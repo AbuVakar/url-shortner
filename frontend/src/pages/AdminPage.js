@@ -119,26 +119,49 @@ const AdminPage = () => {
     }
     
     // Extract the short code from the URL object
-    // It could be in short_code, shortCode, or we can try to extract it from the short URL
+    // Try to get the short code from various possible fields
     let shortCode = url.short_code || url.shortCode;
     
-    // If we don't have a short code, try to extract it from the short URL
+    // If we don't have a short code yet, try to get it from the short URL
     if (!shortCode && url.short_url) {
-      const urlParts = url.short_url.split('/');
-      shortCode = urlParts[urlParts.length - 1];
+      const urlString = url.short_url.toString();
+      // Extract the last segment that doesn't look like a domain
+      const lastSegment = urlString.split('/').pop();
+      if (lastSegment && !lastSegment.includes('.')) {
+        shortCode = lastSegment;
+      }
     }
     
-    // If we still don't have a short code, try to find it in the _id field
+    // If we still don't have a short code, use the _id field
+    // This is a common pattern where the _id is used as the short code
     if (!shortCode && url._id) {
-      shortCode = url._id;
+      shortCode = url._id.toString ? url._id.toString() : url._id;
     }
     
+    // If we have an original_url but no short code, we can generate a hash from it
+    // This is a fallback for very old entries
+    if (!shortCode && url.original_url) {
+      // Simple hash function to generate a short code from the URL
+      const hash = url.original_url.split('').reduce((a, b) => {
+        a = ((a << 5) - a) + b.charCodeAt(0);
+        return a & a;
+      }, 0).toString(16);
+      shortCode = hash.substring(0, 6); // Take first 6 chars of the hash
+    }
+    
+    // If we still don't have a short code, log the full object for debugging
     if (!shortCode) {
       const errorMsg = 'Could not determine short code for deletion';
-      console.error(errorMsg, url);
-      setError('Invalid URL data. Could not determine which URL to delete.');
+      console.error(errorMsg, {
+        url,
+        availableKeys: Object.keys(url),
+        stringified: JSON.stringify(url, null, 2)
+      });
+      setError('Invalid URL data. Could not determine which URL to delete. Please try refreshing the page.');
       return;
     }
+    
+    console.log('Extracted short code:', shortCode, 'from URL object:', url);
 
     console.log('Delete button clicked for URL:', { shortCode, url });
 
@@ -161,10 +184,29 @@ const AdminPage = () => {
     // Optimistic update: Remove the item from UI immediately
     setUrls(prevUrls => {
       const newUrls = prevUrls.filter(u => {
-        // Check all possible fields that might contain the short code
-        const uShortCode = u.short_code || u.shortCode || 
-                          (u.short_url ? u.short_url.split('/').pop() : null) || 
-                          u._id;
+        // Use the same short code extraction logic as in handleDelete
+        let uShortCode = u.short_code || u.shortCode;
+        
+        // Try to get from short_url
+        if (!uShortCode && u.short_url) {
+          const urlString = u.short_url.toString();
+          const lastSegment = urlString.split('/').pop();
+          if (lastSegment && !lastSegment.includes('.')) {
+            uShortCode = lastSegment;
+          }
+        }
+        
+        // Fall back to _id
+        if (!uShortCode && u._id) {
+          uShortCode = u._id.toString ? u._id.toString() : u._id;
+        }
+        
+        // If we still don't have a short code, keep the item (better safe than sorry)
+        if (!uShortCode) {
+          console.warn('Could not determine short code for URL in filter:', u);
+          return true;
+        }
+        
         return uShortCode !== shortCode;
       });
       
