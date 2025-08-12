@@ -24,13 +24,15 @@ const AdminPage = () => {
     setError('');
   }, []);
 
-  // Fetch URLs data
+  // Fetch URLs data with caching
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    // Don't show loading if we're just refreshing in the background
+    if (urls.length === 0) {
+      setLoading(true);
+    }
+    
     setError('');
-    console.log('Fetching URLs...');
     const token = localStorage.getItem('adminToken');
-    console.log('Current token:', token);
     
     if (!token) {
       setLoading(false);
@@ -73,83 +75,64 @@ const AdminPage = () => {
     }
 
     try {
-      setLoginLoading(true);
-      setError('');
-      
-      // Try the login endpoint
       const response = await axios.post(
         `${API_URL}/api/admin/login`,
         { password },
-        getAxiosConfig()
+        { timeout: 5000 } // Add timeout to prevent hanging
       );
-
-      if (response.data && response.data.success && response.data.token) {
-        // Store the token and set authentication state
+      
+      if (response.data.success) {
         localStorage.setItem('adminToken', response.data.token);
         localStorage.setItem('isAdminAuthenticated', 'true');
-        
-        // Set authentication state
         setIsAuthenticated(true);
-        
-        // Fetch the URLs after successful login
-        await fetchData();
+        // Don't wait for fetchData to complete before showing the UI
+        fetchData().finally(() => setLoading(false));
       } else {
-        throw new Error(response.data?.error || 'Invalid login response');
+        setError(response.data.error || 'Login failed');
+        setLoginLoading(false);
       }
     } catch (err) {
       console.error('Login error:', err);
-      
-      // More specific error messages
-      let errorMessage = 'Login failed. Please try again.';
-      if (err.response) {
-        if (err.response.status === 401) {
-          errorMessage = 'Invalid password. Please try again.';
-        } else {
-          errorMessage = err.response.data?.error || err.response.statusText || errorMessage;
-        }
-      } else if (err.request) {
-        errorMessage = 'No response from server. Please check your connection.';
-      }
-      
-      setError(errorMessage);
-      
-      // Clear any existing authentication
-      localStorage.removeItem('adminToken');
-      localStorage.removeItem('isAdminAuthenticated');
-      setIsAuthenticated(false);
-    } finally {
+      setError(
+        err.code === 'ECONNABORTED' 
+          ? 'Request timed out. Please try again.' 
+          : (err.response?.data?.error || 'Failed to login')
+      );
       setLoginLoading(false);
     }
-  }, [password, fetchData]);
+  };
 
-  // handleLogout is already defined at the top of the component
-
-  // Handle delete URL
-  const handleDelete = useCallback(async (id) => {
+  // Handle URL deletion with optimistic updates
+  const handleDelete = useCallback(async (shortCode) => {
     if (!window.confirm('Are you sure you want to delete this URL?')) return;
     
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('adminToken');
-      await axios.delete(
-        `${API_URL}/api/admin/urls/${id}`,
-        getAxiosConfig(token)
-      );
-      
-      // Refresh the URLs list
-      await fetchData();
-    } catch (err) {
-      console.error('Delete error:', err);
-      setError(err.response?.data?.message || 'Failed to delete URL');
-      
-      // If unauthorized, log the user out
-      if (err.response?.status === 401) {
-        handleLogout();
-      }
-    } finally {
-      setLoading(false);
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      setError('Not authenticated');
+      return;
     }
-  }, [fetchData, handleLogout]);
+    
+    // Optimistic update: Remove the item from UI immediately
+    setUrls(prevUrls => {
+      const newUrls = prevUrls.filter(url => url.short_code !== shortCode);
+      // If we're on the last page with one item, go to previous page
+      if (newUrls.length % itemsPerPage === 0 && currentPage > 1) {
+        setCurrentPage(prev => Math.max(1, prev - 1));
+      }
+      return newUrls;
+    });
+    
+    // Fire and forget the delete request
+    axios.delete(
+      `${API_URL}/api/admin/urls/${shortCode}`,
+      getAxiosConfig(token)
+    ).catch(err => {
+      console.error('Error deleting URL:', err);
+      // Revert the optimistic update if there's an error
+      fetchData();
+      setError(err.response?.data?.error || 'Failed to delete URL');
+    });
+  }, [currentPage, itemsPerPage]); // Only include the dependencies we actually use
 
   // Tooltip component
   const Tooltip = ({ text, children }) => {

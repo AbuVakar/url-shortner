@@ -1,30 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from '../config';
+
+// Cache for storing redirect URLs to prevent multiple lookups
+const redirectCache = new Map();
 
 const Redirect = () => {
   const { code } = useParams();
   const navigate = useNavigate();
   const [error, setError] = useState('');
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  const redirectToOriginalUrl = useCallback(async (shortCode) => {
+    // Check cache first
+    if (redirectCache.has(shortCode)) {
+      window.location.href = redirectCache.get(shortCode);
+      return;
+    }
+
+    try {
+      setIsRedirecting(true);
+      
+      // Use a HEAD request first to check if the URL exists (faster than GET)
+      try {
+        await axios.head(`${API_URL}/${shortCode}`, { 
+          timeout: 3000, // 3 second timeout
+          maxRedirects: 0, // Don't follow redirects
+          validateStatus: (status) => status >= 200 && status < 400 // Consider 3xx as success
+        });
+        
+        // If HEAD request succeeds, do the actual redirect
+        const finalUrl = `${API_URL}/${shortCode}`;
+        redirectCache.set(shortCode, finalUrl);
+        window.location.href = finalUrl;
+      } catch (headError) {
+        // If HEAD fails (e.g., CORS), fall back to GET
+        if (headError.response && headError.response.status === 404) {
+          throw new Error('URL not found');
+        }
+        
+        // Fall back to GET if HEAD fails for other reasons
+        const finalUrl = `${API_URL}/${shortCode}`;
+        redirectCache.set(shortCode, finalUrl);
+        window.location.href = finalUrl;
+      }
+    } catch (err) {
+      console.error('Redirect error:', err);
+      setError('Failed to redirect. The link might be invalid or expired.');
+      setIsRedirecting(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const redirectToOriginalUrl = async () => {
-      try {
-        // This will trigger the backend's redirect logic
-        window.location.href = `${API_URL}/${code}`;
-      } catch (err) {
-        console.error('Redirect error:', err);
-        setError('Failed to redirect. The link might be invalid or expired.');
-      }
-    };
-
     if (code) {
-      redirectToOriginalUrl();
+      redirectToOriginalUrl(code);
     } else {
       setError('No short code provided');
     }
-  }, [code]);
+  }, [code, redirectToOriginalUrl]);
 
   if (error) {
     return (

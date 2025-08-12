@@ -68,13 +68,28 @@ router.get("/:code", async (req, res) => {
     );
     
     if (urlData) {
-      return res.redirect(urlData.original_url);
+      // Check if it's an AJAX request
+      if (req.xhr || req.get('X-Requested-With') === 'XMLHttpRequest') {
+        return res.json({ redirect: urlData.original_url });
+      } else {
+        // Regular browser request
+        return res.redirect(302, urlData.original_url);
+      }
     } else {
-      return res.status(404).json({ error: "URL not found" });
+      if (req.xhr || req.get('X-Requested-With') === 'XMLHttpRequest') {
+        return res.status(404).json({ error: "URL not found" });
+      } else {
+        // For direct browser access, send a simple HTML response
+        return res.status(404).send('<h1>404 - URL not found</h1>');
+      }
     }
   } catch (err) {
     console.error("Redirect error:", err);
-    return res.status(500).json({ error: "Server error" });
+    if (req.xhr || req.get('X-Requested-With') === 'XMLHttpRequest') {
+      return res.status(500).json({ error: "Server error" });
+    } else {
+      return res.status(500).send('<h1>500 - Server Error</h1>');
+    }
   }
 });
 
@@ -94,20 +109,21 @@ router.get("/api/admin/urls", isAdmin, async (req, res) => {
   }
 });
 
-// Admin: Delete a URL
-router.delete("/api/admin/urls/:short_code", isAdmin, async (req, res) => {
+// Admin: Delete URL (Optimized for performance)
+router.delete("/api/admin/urls/:code", isAdmin, async (req, res) => {
   try {
-    const { short_code } = req.params;
-    const result = await Url.findOneAndDelete({ short_code });
+    // Use deleteOne directly without checking first for better performance
+    const result = await Url.deleteOne({ short_code: req.params.code });
     
-    if (!result) {
-      return res.status(404).json({ error: "URL not found" });
-    }
-    
-    res.json({ message: "URL deleted successfully" });
+    // If you need to know if the document was deleted, use result.deletedCount
+    // But don't make an extra query just to check if it existed
+    return res.json({ 
+      success: true,
+      deletedCount: result.deletedCount 
+    });
   } catch (err) {
-    console.error("Error deleting URL:", err);
-    res.status(500).json({ error: "Failed to delete URL" });
+    console.error("Delete error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
