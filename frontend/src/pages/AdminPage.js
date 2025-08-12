@@ -390,6 +390,105 @@ const AdminPage = () => {
     );
   }
 
+  // Render login form if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loginContainer}>
+          <h2>Admin Login</h2>
+          {error && <div style={styles.errorBox}><p>{error}</p></div>}
+          <form onSubmit={handleLogin} style={styles.loginForm}>
+            <div style={styles.formGroup}>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter admin password"
+                autoComplete="new-password"
+                required
+                style={styles.input}
+              />
+            </div>
+            <button 
+              type="submit" 
+              disabled={loginLoading}
+              style={styles.loginButton}
+            >
+              {loginLoading ? 'Logging in...' : 'Login'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Main admin dashboard
+  // Render login form if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loginContainer}>
+          <h2>Admin Login</h2>
+          {error && <div style={styles.errorBox}><p>{error}</p></div>}
+          <form onSubmit={handleLogin} style={styles.loginForm}>
+            <div style={styles.formGroup}>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter admin password"
+                autoComplete="new-password"
+                required
+                style={styles.input}
+              />
+            </div>
+            <button 
+              type="submit" 
+              disabled={loginLoading}
+              style={styles.loginButton}
+            >
+              {loginLoading ? 'Logging in...' : 'Login'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Main admin dashboard
+  // Render login form if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loginContainer}>
+          <h2>Admin Login</h2>
+          {error && <div style={styles.errorBox}><p>{error}</p></div>}
+          <form onSubmit={handleLogin} style={styles.loginForm}>
+            <div style={styles.formGroup}>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter admin password"
+                autoComplete="new-password"
+                required
+                style={styles.input}
+              />
+            </div>
+            <button 
+              type="submit" 
+              disabled={loginLoading}
+              style={styles.loginButton}
+            >
+              {loginLoading ? 'Logging in...' : 'Login'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Main admin dashboard
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -454,62 +553,25 @@ const AdminPage = () => {
 
       {/* URL Table */}
       <div style={styles.tableContainer}>
+        {loading ? (
+          <div style={styles.loading}>
+            <p>Loading URLs...</p>
           </div>
-        </div>
-      ) : urls.length === 0 ? (
-        <div style={styles.emptyState}>
-          <p>No URLs found. Start by creating your first short URL.</p>
-        </div>
-      ) : (
-        <>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={{ ...styles.th, width: '20%' }}>Short URL</th>
-                <th style={{ ...styles.th, width: '50%' }}>Original URL</th>
-                <th style={{ ...styles.th, width: '10%', textAlign: 'right' }}>Visits</th>
-                <th style={{ ...styles.th, width: '12%' }}>Created</th>
-                <th style={{ ...styles.th, width: '8%', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentItems.map((url) => (
-                <tr key={url._id} style={styles.tr}>
-                  <td style={styles.td}>
-                    <a 
-                      href={`${API_URL}/${url.short_code}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={styles.link}
-                    >
-                      {`${API_URL}/${url.short_code}`}
-                      <FiExternalLink size={14} style={{ marginLeft: '4px' }} />
-                    </a>
-                  </td>
-                  <td style={styles.td}>
-                    <span style={styles.originalUrl} title={url.original_url}>
-                      {url.original_url && url.original_url.length > 50 
-                        ? `${url.original_url.substring(0, 47)}...` 
-                        : url.original_url}
-                    </span>
-                  </td>
-                  <td style={{ ...styles.td, textAlign: 'right' }}>
-                    {url.visits || 0}
-                  </td>
-                  <td style={styles.td}>
-                    {formatDate(url.created_at || url.createdAt || url.date_created)}
-                  </td>
-                  <td style={{ ...styles.td, textAlign: 'right' }} key={`actions-${url.short_code}`}>
-                    <button
-                      onClick={() => handleDelete(url)}
-                      style={{ ...styles.iconButton, color: '#EF4444' }}
-                      title="Delete URL"
-                      key={`delete-${url.short_code}`}
-                      aria-label={`Delete ${url.short_code}`}
-                    >
-                      <FiTrash2 />
-                    </button>
-                  </td>
+        ) : error ? (
+          <div style={styles.errorBox}>
+            <p>{error}</p>
+            <button 
+              onClick={fetchData}
+              style={styles.retryButton}
+            >
+              Retry
+            </button>
+          </div>
+        ) : urls.length === 0 ? (
+          <div style={styles.emptyState}>
+            <p>No URLs found. Start by creating your first short URL.</p>
+          </div>
+        ) : (
           <>
             <table style={styles.table}>
               <thead>
@@ -548,12 +610,11 @@ const AdminPage = () => {
                     <td style={styles.td}>
                       {formatDate(url.created_at || url.createdAt || url.date_created)}
                     </td>
-                    <td style={{ ...styles.td, textAlign: 'right' }} key={`actions-${url.short_code}`}>
+                    <td style={{ ...styles.td, textAlign: 'right' }}>
                       <button
                         onClick={() => handleDelete(url)}
                         style={{ ...styles.iconButton, color: '#EF4444' }}
                         title="Delete URL"
-                        key={`delete-${url.short_code}`}
                         aria-label={`Delete ${url.short_code}`}
                       >
                         <FiTrash2 />
